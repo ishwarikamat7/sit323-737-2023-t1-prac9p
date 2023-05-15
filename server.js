@@ -1,145 +1,107 @@
-const express= require("express");
-const res = require("express/lib/response");
-const app= express();
-const fs = require('fs');
-const winston = require('winston');
-const logger = winston.createLogger({
-    level: 'info',
-    format: winston.format.json(),
-    defaultMeta: { service: 'calculate-service' },
-    transports: [
-      //
-      // - Write all logs with importance level of `error` or less to `error.log`
-      // - Write all logs with importance level of `info` or less to `combined.log`
-      //
-      new winston.transports.File({ filename: 'error.log', level: 'error' }),
-      new winston.transports.File({ filename: 'combined.log' }),
-    ],
+const express = require('express');
+const { MongoClient } = require('mongodb');
+const { ObjectId } = require('mongodb');
+
+const app = express();
+const port = 3000;
+
+//const mongoURI = 'mongodb+srv://ishwarikmt7:2Lv2s38ukehP6Azf@sit737.vqrimax.mongodb.net/';
+const mongoURI = process.env.MONGO_URI;
+const dbName = 'task9P';
+const collectionName = 'task9P';
+app.use(express.json());
+// Create a reusable function to connect to MongoDB
+async function connectToMongo() {
+  const client = new MongoClient(mongoURI);
+
+  try {
+    await client.connect();
+    console.log('Connected to MongoDB Atlas');
+
+    const db = client.db(dbName);
+    const collection = db.collection(collectionName);
+
+    return collection;
+  } catch (err) {
+    console.error('Error connecting to MongoDB Atlas', err);
+    throw err;
+  }
+}
+
+app.get('/', async (req, res) => {
+    res.send("Hello, this is task 9.1P")
+  });
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK' });
+  });
+
+app.get('/api/tasks', async (req, res) => {
+  try {
+    const collection = await connectToMongo();
+    const tasks = await collection.find().toArray();
+    res.json(tasks);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/addTasks', async (req, res) => {
+    try {
+      const collection = await connectToMongo();
+      const newTask = req.body;
+  
+      // Insert the new task into the collection
+      const result = await collection.insertOne(newTask);
+  
+      res.status(201).json({ message: 'Task added successfully', taskId: result.insertedId });
+    } catch (err) {
+        console.error('Error adding task', err);
+        res.status(500).json({ error: 'Failed to add task' });
+    }
+  });
+
+  app.put('/api/updateTasks/:id', async (req, res) => {
+    try {
+      const collection = await connectToMongo();
+      const taskId = req.params.id;
+      const updatedTask = req.body;
+  
+      // Update the task in the collection
+      const result = await collection.updateOne({ _id: new ObjectId(taskId) }, { $set: updatedTask });
+  
+      if (result.matchedCount === 0) {
+        res.status(404).json({ error: 'Task not found' });
+      } else {
+        res.json({ message: 'Task updated successfully' });
+      }
+    } catch (err) {
+      console.error('Error updating task', err);
+      res.status(500).json({ error: 'Failed to update task' });
+    }
+  });
+
+  app.delete('/api/deleteTasks/:id', async (req, res) => {
+    try {
+      const collection = await connectToMongo();
+      const taskId = req.params.id;
+  
+      // Delete the task with the given ID
+      const result = await collection.deleteOne({ _id: new ObjectId(taskId) });
+  
+      if (result.deletedCount === 0) {
+        // No task was deleted
+        res.status(404).json({ error: `Task with ID ${taskId} not found` });
+      } else {
+        res.json({ message: 'Task deleted successfully' });
+      }
+    } catch (err) {
+      console.error('Error deleting task', err);
+      res.status(500).json({ error: 'Failed to delete task' });
+    }
   });
   
-  //
-  // If we're not in production then log to the `console` with the format:
-  // `${info.level}: ${info.message} JSON.stringify({ ...rest }) `
-  //
-  if (process.env.NODE_ENV !== 'production') {
-    logger.add(new winston.transports.Console({
-      format: winston.format.simple(),
-    }));
-  }
-const add= (n1,n2) => {
-    return n1+n2;
-}
-const subtract = (n1,n2) => {
-    return n1-n2;
-}
-const multiply = (n1,n2) => {
-    return n1*n2;
-}
-const divide = (n1,n2) => {
-    return n1/n2;
-}
-app.get("/add", (req,res)=>{
-    try{
-    const n1= parseFloat(req.query.n1);
-    const n2=parseFloat(req.query.n2);
-    if(isNaN(n1)) {
-        logger.error("n1 is incorrectly defined");
-        throw new Error("n1 incorrectly defined");
-    }
-    if(isNaN(n2)) {
-        logger.error("n2 is incorrectly defined");
-        throw new Error("n2 incorrectly defined");
-    }
-    
-    if (n1 === NaN || n2 === NaN) {
-        console.log()
-        throw new Error("Parsing Error");
-    }
-    logger.info('Parameters '+n1+' and '+n2+' received for addition');
-    const result = add(n1,n2);
-    url = "/add"
-    res.status(200).json({statuscocde:200, data: result }); 
-    } catch(error) { 
-        console.error(error)
-        res.status(500).json({statuscocde:500, msg: error.toString() })
-      }
+
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
 });
-app.get("/subtract", (req,res)=>{
-    try{
-    const n1= parseFloat(req.query.n1);
-    const n2=parseFloat(req.query.n2);
-    if(isNaN(n1)) {
-        logger.error("n1 is incorrectly defined");
-        throw new Error("n1 incorrectly defined");
-    }
-    if(isNaN(n2)) {
-        logger.error("n2 is incorrectly defined");
-        throw new Error("n2 incorrectly defined");
-    }
-    
-    if (n1 === NaN || n2 === NaN) {
-        console.log()
-        throw new Error("Parsing Error");
-    }
-    logger.info('Parameters '+n1+' and '+n2+' received for subtraction');
-    const result = subtract(n1,n2);
-    res.status(200).json({statuscocde:200, data: result }); 
-    } catch(error) { 
-        console.error(error)
-        res.status(500).json({statuscocde:500, msg: error.toString() })
-      }
-});
-app.get("/multiply", (req,res)=>{
-    try{
-    const n1= parseFloat(req.query.n1);
-    const n2=parseFloat(req.query.n2);
-    if(isNaN(n1)) {
-        logger.error("n1 is incorrectly defined");
-        throw new Error("n1 incorrectly defined");
-    }
-    if(isNaN(n2)) {
-        logger.error("n2 is incorrectly defined");
-        throw new Error("n2 incorrectly defined");
-    }
-    
-    if (n1 === NaN || n2 === NaN) {
-        console.log()
-        throw new Error("Parsing Error");
-    }
-    logger.info('Parameters '+n1+' and '+n2+' received for multiplication');
-    const result = multiply(n1,n2);
-    res.status(200).json({statuscocde:200, data: result }); 
-    } catch(error) { 
-        console.error(error)
-        res.status(500).json({statuscocde:500, msg: error.toString() })
-      }
-});
-app.get("/divide", (req,res)=>{
-    try{
-    const n1= parseFloat(req.query.n1);
-    const n2=parseFloat(req.query.n2);
-    if(isNaN(n1)) {
-        logger.error("n1 is incorrectly defined");
-        throw new Error("n1 incorrectly defined");
-    }
-    if(isNaN(n2)) {
-        logger.error("n2 is incorrectly defined");
-        throw new Error("n2 incorrectly defined");
-    }
-    
-    if (n1 === NaN || n2 === NaN) {
-        console.log()
-        throw new Error("Parsing Error");
-    }
-    logger.info('Parameters '+n1+' and '+n2+' received for division');
-    const result = divide(n1,n2);
-    res.status(200).json({statuscocde:200, data: result }); 
-    } catch(error) { 
-        console.error(error)
-        res.status(500).json({statuscocde:500, msg: error.toString() })
-      }
-});
-const port=3040;
-app.listen(port,()=> {
-    console.log("hello i'm listening to port " +port);
-})
